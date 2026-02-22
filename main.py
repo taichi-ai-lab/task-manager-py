@@ -3,8 +3,22 @@
 import sys
 from pathlib import Path
 
+# Force UTF-8 throughout (Windows cp932 fix).
+# Best invoked with: python -X utf8 main.py  (or via start.bat / start.ps1)
+import os
+os.environ.setdefault("PYTHONUTF8", "1")
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # Allow running from project root without installing
 sys.path.insert(0, str(Path(__file__).parent))
+
+# Load .env file if present (ANTHROPIC_API_KEY etc.)
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent / ".env")
 
 import storage
 import agent
@@ -15,15 +29,14 @@ from rich.prompt import Prompt
 from rich.rule import Rule
 
 
-console = Console()
+console = Console(highlight=False)
 
-BANNER = """
- ████████╗ █████╗ ███████╗██╗  ██╗    ███╗   ███╗ ██████╗ ██████╗
-    ██╔══╝██╔══██╗██╔════╝██║ ██╔╝    ████╗ ████║██╔════╝ ██╔══██╗
-    ██║   ███████║███████╗█████╔╝     ██╔████╔██║██║  ███╗██████╔╝
-    ██║   ██╔══██║╚════██║██╔═██╗     ██║╚██╔╝██║██║   ██║██╔══██╗
-    ██║   ██║  ██║███████║██║  ██╗    ██║ ╚═╝ ██║╚██████╔╝██║  ██║
-    ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝   ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝
+BANNER = r"""
+ _____ _    ____  _  __   __  __  ____ ____
+|_   _/ \  / ___|| |/ /  |  \/  |/ ___|  _ \
+  | |/ _ \ \___ \| ' /   | |\/| | |  _| |_) |
+  | / ___ \ ___) | . \   | |  | | |_| |  _ <
+  |_/_/   \_\____/|_|\_\  |_|  |_|\____|_| \_\
 """
 
 HELP_TEXT = """\

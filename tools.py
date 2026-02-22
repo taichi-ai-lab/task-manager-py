@@ -140,13 +140,13 @@ def run_tool(name: str, inputs: dict[str, Any]) -> str:
     try:
         if name == "add_task":
             task = storage.add_task(**inputs)
-            return json.dumps({"success": True, "task": task.to_dict()}, ensure_ascii=False)
+            return json.dumps({"success": True, "task": task.to_dict()}, ensure_ascii=True)
 
         elif name == "list_tasks":
             tasks = storage.list_tasks(**inputs)
             return json.dumps(
                 {"tasks": [t.to_dict() for t in tasks], "count": len(tasks)},
-                ensure_ascii=False,
+                ensure_ascii=True,
             )
 
         elif name == "update_task":
@@ -154,7 +154,7 @@ def run_tool(name: str, inputs: dict[str, Any]) -> str:
             task = storage.update_task(task_id, **inputs)
             if task is None:
                 return json.dumps({"success": False, "error": f"Task {task_id} not found."})
-            return json.dumps({"success": True, "task": task.to_dict()}, ensure_ascii=False)
+            return json.dumps({"success": True, "task": task.to_dict()}, ensure_ascii=True)
 
         elif name == "delete_task":
             ok = storage.delete_task(inputs["task_id"])
@@ -164,12 +164,12 @@ def run_tool(name: str, inputs: dict[str, Any]) -> str:
             tasks = storage.search_tasks(inputs["query"])
             return json.dumps(
                 {"tasks": [t.to_dict() for t in tasks], "count": len(tasks)},
-                ensure_ascii=False,
+                ensure_ascii=True,
             )
 
         elif name == "get_stats":
             stats = storage.get_stats()
-            return json.dumps(stats, ensure_ascii=False)
+            return json.dumps(stats, ensure_ascii=True)
 
         else:
             return json.dumps({"error": f"Unknown tool: {name}"})
