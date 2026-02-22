@@ -6,6 +6,10 @@ from pathlib import Path
 # Allow running from project root without installing
 sys.path.insert(0, str(Path(__file__).parent))
 
+# Load .env file if present (ANTHROPIC_API_KEY etc.)
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent / ".env")
+
 import storage
 import agent
 from rich.console import Console
