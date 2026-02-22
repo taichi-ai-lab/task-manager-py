@@ -1,8 +1,19 @@
 """Claude agent with tool use for natural language task management."""
 import os
-from typing import Optional
+import json
+import traceback
+from pathlib import Path
+from typing import Any, Optional
 import anthropic
 from tools import TOOL_SCHEMAS, run_tool
+
+_LOG = Path(__file__).parent / "error.log"
+
+
+def _log_exc() -> None:
+    """Write the current exception traceback to error.log."""
+    with open(_LOG, "a", encoding="utf-8") as f:
+        traceback.print_exc(file=f)
 
 _client: Optional[anthropic.Anthropic] = None
 
@@ -23,6 +34,30 @@ Guidelines:
 """
 
 
+def _block_to_dict(block: Any) -> dict:
+    """Convert a response content block (Pydantic model) to a plain ASCII-safe dict.
+
+    Why: Pydantic v2's model_dump_json() uses a Rust serializer with ensure_ascii=False,
+    embedding raw Unicode bytes. Re-encoding through json.loads(json.dumps(...)) forces
+    Python's standard json module (ensure_ascii=True by default) so all non-ASCII chars
+    become escaped sequences safe for any downstream codec.
+    """
+    if block.type == "text":
+        raw = {"type": "text", "text": block.text}
+    elif block.type == "tool_use":
+        raw = {
+            "type": "tool_use",
+            "id": block.id,
+            "name": block.name,
+            "input": block.input,
+        }
+    else:
+        raw = block.model_dump() if hasattr(block, "model_dump") else {"type": block.type}
+
+    # Round-trip through JSON with ensure_ascii=True to guarantee ASCII-safe strings.
+    return json.loads(json.dumps(raw, ensure_ascii=True))
+
+
 def _get_client() -> anthropic.Anthropic:
     global _client
     if _client is None:
@@ -36,7 +71,7 @@ def _get_client() -> anthropic.Anthropic:
     return _client
 
 
-def chat(user_message: str, history: list[dict]) -> tuple[str, list[dict]]:
+def _chat(user_message: str, history: list[dict]) -> tuple[str, list[dict]]:
     """
     Send a user message, execute any tool calls, and return the assistant reply.
 
@@ -59,8 +94,14 @@ def chat(user_message: str, history: list[dict]) -> tuple[str, list[dict]]:
             messages=history,
         )
 
-        # Append assistant message to history
-        history.append({"role": "assistant", "content": response.content})
+        # Convert Pydantic content blocks to plain dicts.
+        # Passing raw Pydantic objects causes the SDK's Rust-based JSON serializer
+        # (ensure_ascii=False) to embed raw Unicode, which then fails when the
+        # underlying HTTP layer tries to encode with ASCII on Windows cp932.
+        history.append({
+            "role": "assistant",
+            "content": [_block_to_dict(b) for b in response.content],
+        })
 
         if response.stop_reason == "end_turn":
             # Extract text reply
@@ -92,3 +133,12 @@ def chat(user_message: str, history: list[dict]) -> tuple[str, list[dict]]:
         break
 
     return "(No response)", history
+
+
+def chat(user_message: str, history: list[dict]) -> tuple[str, list[dict]]:
+    # Thin wrapper that logs unexpected exceptions to error.log before re-raising.
+    try:
+        return _chat(user_message, history)
+    except Exception:
+        _log_exc()
+        raise
